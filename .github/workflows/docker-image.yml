@@ -16,7 +16,7 @@ jobs:
     - name: Update and Restart
       run: |
         # Укажите полный путь к папке с ботом на вашем сервере!
-        cd /home/user/hh_bot
+        cd /home/user/hh_notifier
         
         # Обновляем код
         git pull
