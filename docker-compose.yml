@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  hh-bot:
+    build: .
+    container_name: hh_bot_container
+    restart: always
+    environment:
+      - TZ=Europe/Moscow
+    volumes:
+      # Пробрасываем оба файла
+      - ./seen_vacancies.json:/app/seen_vacancies.json
+      - ./bot_config.json:/app/bot_config.json
