@@ -6,7 +6,6 @@ import os
 from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
 from aiogram.types import Message
-
 # --- КОНФИГУРАЦИЯ ---
 API_TOKEN = 'ВАШ_ТОКЕН'  # <--- Вставьте токен
 CHECK_INTERVAL = 5 * 60  # Проверка каждые 5 минут
