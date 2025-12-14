@@ -8,16 +8,17 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 # --- КОНФИГУРАЦИЯ ---
-API_TOKEN = '8276972592:AAFnjZoprMGjmJAzqs7Pb8t3DhR64EMXesM'
-CHECK_INTERVAL = 10 * 60
+API_TOKEN = 'ВАШ_ТОКЕН'  # <--- Вставьте токен
+CHECK_INTERVAL = 5 * 60  # Проверка каждые 5 минут
 DB_FILE = "seen_vacancies.json"
-CONFIG_FILE = "bot_config.json"  # <--- Файл для настроек (кто запустил бота)
+CONFIG_FILE = "bot_config.json"
+ALLOWED_USERS = [123456789]  # <--- Вставьте ваш ID
 
-# Ваш ID (белый список)
-ALLOWED_USERS = [686621427]
+# ID регионов (можно найти на api.hh.ru/areas)
+AREA_RUSSIA = 113
+AREA_VORONEZH = 26
 
-# 1. Более точные запросы
-# Используем кавычки для точных фраз, чтобы ML не путался с XML и т.д.
+# Ключевые слова
 SEARCH_QUERIES = [
     'Python developer',
     'Data Scientist',
@@ -30,22 +31,20 @@ SEARCH_QUERIES = [
     'AI engineer'
 ]
 
-# 2. Черный список слов в названии (в нижнем регистре)
-# Если эти слова есть в заголовке - вакансия игнорируется
+# Черный список слов (фильтр мусора)
 EXCLUDED_WORDS = [
     'системный', 'system',
     'администратор', 'administrator', 'admin',
-    'преподаватель', 'teacher', 'курсов', 'куратор',
+    'преподаватель', 'teacher', 'mentor', 'ментор',
     'support', 'поддержки',
-    'manager', 'менеджер',  # Чтобы убрать Affiliate Manager
+    'manager', 'менеджер',
     'sales', 'продаж',
-    '1с', '1c',  # Часто лезет в аналитику
+    '1с', '1c',
     'бизнес-аналитик', 'business analyst',
-    'директор', 'head', 'cfo', 'ceo'
+    'директор', 'head', 'cfo', 'ceo', 'lead'
 ]
 
-SEARCH_AREA = 113
-HH_HEADERS = {"User-Agent": "MyTelegramBot/3.0 (danning600@gmail.com)"}
+HH_HEADERS = {"User-Agent": "MyTelegramBot/6.0 (myemail@example.com)"}
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=API_TOKEN)
@@ -55,7 +54,7 @@ seen_vacancies = set()
 active_chat_id = None
 
 
-# --- ФУНКЦИИ ---
+# --- РАБОТА С ФАЙЛАМИ ---
 def load_data():
     global seen_vacancies, active_chat_id
     if os.path.exists(DB_FILE):
@@ -89,19 +88,26 @@ def save_config(chat_id):
         pass
 
 
-async def get_vacancies(query):
+# --- API ---
+async def get_vacancies(query, area_id, schedule=None):
+    """
+    Универсальная функция поиска.
+    :param query: текст запроса
+    :param area_id: ID региона (113 Россия или 26 Воронеж)
+    :param schedule: 'remote' для удаленки или None для всего остального
+    """
     url = "https://api.hh.ru/vacancies"
     params = {
         "text": query,
-        "area": SEARCH_AREA,
-        "per_page": 20,  # Берем чуть больше, так как часть отфильтруем
+        "area": area_id,
+        "per_page": 20,
         "order_by": "publication_time",
-
-        # !!! ГЛАВНОЕ ИЗМЕНЕНИЕ !!!
-        # Ищем только в названии вакансии.
-        # Это уберет сисадминов, у которых Python просто упомянут в стеке.
-        # "search_field": "name"
+        "search_field": "name"  # Ищем только в названии
     }
+    # Если передали параметр расписания (например, remote), добавляем его
+    if schedule:
+        params["schedule"] = schedule
+
     async with aiohttp.ClientSession() as session:
         async with session.get(url, params=params, headers=HH_HEADERS) as response:
             if response.status == 200:
@@ -124,22 +130,22 @@ def format_salary(salary_data):
     return "Не указана"
 
 
-# --- ЛОГИКА ФИЛЬТРАЦИИ ---
+# --- ФИЛЬТР ---
 def is_relevant(title):
     title_lower = title.lower()
-    # Проверяем, нет ли запрещенных слов
     for bad_word in EXCLUDED_WORDS:
         if bad_word in title_lower:
             return False
     return True
 
 
+# --- ЦИКЛ ПРОВЕРКИ ---
 async def scheduled_checker():
     global seen_vacancies
     first_run = len(seen_vacancies) == 0
 
     if active_chat_id:
-        await bot.send_message(active_chat_id, "🚀 Умный фильтр вакансий запущен.")
+        await bot.send_message(active_chat_id, "🌍 Фильтр: Воронеж ИЛИ Удаленка (РФ).")
 
     while True:
         if not active_chat_id:
@@ -148,32 +154,49 @@ async def scheduled_checker():
 
         try:
             found_new = False
-            for query in SEARCH_QUERIES:
-                items = await get_vacancies(query)
 
-                # Идем по списку полученных вакансий
-                for vac in reversed(items):
+            for query in SEARCH_QUERIES:
+                # Делаем ДВА запроса для каждого слова
+
+                # 1. Ищем удаленку по всей России
+                remote_jobs = await get_vacancies(query, area_id=AREA_RUSSIA, schedule='remote')
+
+                # 2. Ищем всё в Воронеже (и офис, и гибрид, и удаленку)
+                voronezh_jobs = await get_vacancies(query, area_id=AREA_VORONEZH, schedule=None)
+
+                # Объединяем списки
+                all_items = remote_jobs + voronezh_jobs
+
+                # Обрабатываем (используем reversed, чтобы сначала обрабатывать старые из пачки)
+                # Важно: из-за объединения списков порядок может сбиться, но для уведомлений это не критично
+                for vac in reversed(all_items):
                     v_id = vac['id']
                     v_title = vac['name']
 
                     if v_id not in seen_vacancies:
                         seen_vacancies.add(v_id)
 
-                        # !!! ФИЛЬТРАЦИЯ !!!
-                        # Если вакансия содержит стоп-слова, мы её помечаем как "просмотренную",
-                        # но НЕ отправляем в чат.
+                        # Фильтр стоп-слов
                         if not is_relevant(v_title):
                             continue
 
                         found_new = True
 
                         if not first_run:
+                            # Достаем инфу о графике и городе для красоты
+                            schedule_name = vac.get('schedule', {}).get('name', '')
+                            area_name = vac.get('area', {}).get('name', '')
+
+                            # Ставим эмодзи в зависимости от типа
+                            loc_emoji = "🏠" if "удаленная" in schedule_name.lower() else "🏢"
+
                             text = (
                                 f"🔥 <b>{query}</b>\n"
                                 f"💼 {v_title}\n"
-                                f"🏢 {vac['employer']['name']}\n"
+                                f"{loc_emoji} {area_name} • {schedule_name}\n"
+                                f"🏦 {vac['employer']['name']}\n"
                                 f"💰 {format_salary(vac['salary'])}\n"
-                                f"🔗 <a href='{vac['alternate_url']}'>Ссылка</a>"
+                                f"🔗 <a href='{vac['alternate_url']}'>Откликнуться</a>"
                             )
                             try:
                                 await bot.send_message(active_chat_id, text, parse_mode="HTML",
@@ -182,6 +205,7 @@ async def scheduled_checker():
                             except Exception:
                                 pass
 
+                # Пауза между ключевыми словами
                 await asyncio.sleep(2)
 
             if found_new:
@@ -189,7 +213,7 @@ async def scheduled_checker():
 
             if first_run:
                 first_run = False
-                await bot.send_message(active_chat_id, "✅ Первичный анализ завершен. Жду только релевантные.")
+                await bot.send_message(active_chat_id, "✅ База обновлена. Мониторинг активен.")
 
         except Exception as e:
             logging.error(f"Error: {e}")
@@ -204,9 +228,9 @@ async def cmd_start(message: Message):
     active_chat_id = message.chat.id
     save_config(active_chat_id)
     if monitoring_task is None:
-        await message.answer("Мониторинг обновлен.")
+        await message.answer("Мониторинг запущен.")
     else:
-        await message.answer("Работаю!")
+        await message.answer("Я работаю!")
 
 
 async def main():
