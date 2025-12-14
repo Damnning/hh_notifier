@@ -6,12 +6,13 @@ import os
 from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
 from aiogram.types import Message
+
 # --- КОНФИГУРАЦИЯ ---
-API_TOKEN = 'ВАШ_ТОКЕН'  # <--- Вставьте токен
-CHECK_INTERVAL = 5 * 60  # Проверка каждые 5 минут
+API_TOKEN = '8276972592:AAFnjZoprMGjmJAzqs7Pb8t3DhR64EMXesM'
+CHECK_INTERVAL = 10 * 60
 DB_FILE = "seen_vacancies.json"
 CONFIG_FILE = "bot_config.json"
-ALLOWED_USERS = [123456789]  # <--- Вставьте ваш ID
+ALLOWED_USERS = [686621427]
 
 # ID регионов (можно найти на api.hh.ru/areas)
 AREA_RUSSIA = 113
@@ -34,16 +35,16 @@ SEARCH_QUERIES = [
 EXCLUDED_WORDS = [
     'системный', 'system',
     'администратор', 'administrator', 'admin',
-    'преподаватель', 'teacher', 'mentor', 'ментор',
+    'преподаватель', 'teacher', 'курсов', 'куратор',
     'support', 'поддержки',
-    'manager', 'менеджер',
+    'manager', 'менеджер',  # Чтобы убрать Affiliate Manager
     'sales', 'продаж',
-    '1с', '1c',
+    '1с', '1c',  # Часто лезет в аналитику
     'бизнес-аналитик', 'business analyst',
-    'директор', 'head', 'cfo', 'ceo', 'lead'
+    'директор', 'head', 'cfo', 'ceo'
 ]
 
-HH_HEADERS = {"User-Agent": "MyTelegramBot/6.0 (myemail@example.com)"}
+HH_HEADERS = {"User-Agent": "MyTelegramBot/3.0 (danning600@gmail.com)"}
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=API_TOKEN)
