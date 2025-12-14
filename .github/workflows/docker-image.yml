@@ -1,0 +1,28 @@
+name: Deploy Home Server
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    # Самое важное: указываем, что выполнять нужно на ВАШЕМ сервере
+    runs-on: self-hosted
+
+    steps:
+    # Нам не нужен actions/checkout, так как код уже лежит на сервере в папке.
+    # Мы просто зайдем в папку и обновим его.
+    
+    - name: Update and Restart
+      run: |
+        # Укажите полный путь к папке с ботом на вашем сервере!
+        cd /home/user/hh_bot
+        
+        # Обновляем код
+        git pull
+        
+        # Пересобираем контейнер
+        docker compose up -d --build
+        
+        # Чистим мусор
+        docker image prune -f
