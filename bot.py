@@ -18,6 +18,9 @@ ALLOWED_USERS = [686621427]
 AREA_RUSSIA = 113
 AREA_VORONEZH = 26
 
+# Оставляем только "Без опыта" и "1-3 года"
+TARGET_EXPERIENCE = ["noExperience", "between1And3"]
+
 # Ключевые слова
 SEARCH_QUERIES = [
     'Python developer',
@@ -33,7 +36,7 @@ SEARCH_QUERIES = [
 
 # Черный список слов (фильтр мусора)
 EXCLUDED_WORDS = [
-    'системный', 'system',
+    'системный', 'system', 'Fullstack', 'Django', 'Senior', 'Ведущий', 'React', 'Vue', 'Lead',
     'администратор', 'administrator', 'admin',
     'преподаватель', 'teacher', 'курсов', 'куратор',
     'support', 'поддержки',
@@ -91,10 +94,7 @@ def save_config(chat_id):
 # --- API ---
 async def get_vacancies(query, area_id, schedule=None):
     """
-    Универсальная функция поиска.
-    :param query: текст запроса
-    :param area_id: ID региона (113 Россия или 26 Воронеж)
-    :param schedule: 'remote' для удаленки или None для всего остального
+    Универсальная функция поиска с фильтром опыта.
     """
     url = "https://api.hh.ru/vacancies"
     params = {
@@ -102,13 +102,15 @@ async def get_vacancies(query, area_id, schedule=None):
         "area": area_id,
         "per_page": 20,
         "order_by": "publication_time",
-        "search_field": "name"  # Ищем только в названии
+        "search_field": "name",
+        "experience": TARGET_EXPERIENCE  # <--- ДОБАВИЛИ ФИЛЬТР ПО ОПЫТУ
     }
-    # Если передали параметр расписания (например, remote), добавляем его
+
     if schedule:
         params["schedule"] = schedule
 
     async with aiohttp.ClientSession() as session:
+        # aiohttp автоматически превратит список experience в experience=...&experience=...
         async with session.get(url, params=params, headers=HH_HEADERS) as response:
             if response.status == 200:
                 data = await response.json()
@@ -145,7 +147,7 @@ async def scheduled_checker():
     first_run = len(seen_vacancies) == 0
 
     if active_chat_id:
-        await bot.send_message(active_chat_id, "🌍 Фильтр: Воронеж ИЛИ Удаленка (РФ).")
+        await bot.send_message(active_chat_id, "🌍 Фильтр: (Воронеж ИЛИ Удаленка) + (Без опыта ИЛИ 1-3 года).")
 
     while True:
         if not active_chat_id:
@@ -156,19 +158,14 @@ async def scheduled_checker():
             found_new = False
 
             for query in SEARCH_QUERIES:
-                # Делаем ДВА запроса для каждого слова
-
-                # 1. Ищем удаленку по всей России
+                # 1. Удаленка (РФ) + нужный опыт
                 remote_jobs = await get_vacancies(query, area_id=AREA_RUSSIA, schedule='remote')
 
-                # 2. Ищем всё в Воронеже (и офис, и гибрид, и удаленку)
+                # 2. Воронеж (любой график) + нужный опыт
                 voronezh_jobs = await get_vacancies(query, area_id=AREA_VORONEZH, schedule=None)
 
-                # Объединяем списки
                 all_items = remote_jobs + voronezh_jobs
 
-                # Обрабатываем (используем reversed, чтобы сначала обрабатывать старые из пачки)
-                # Важно: из-за объединения списков порядок может сбиться, но для уведомлений это не критично
                 for vac in reversed(all_items):
                     v_id = vac['id']
                     v_title = vac['name']
@@ -176,23 +173,22 @@ async def scheduled_checker():
                     if v_id not in seen_vacancies:
                         seen_vacancies.add(v_id)
 
-                        # Фильтр стоп-слов
                         if not is_relevant(v_title):
                             continue
 
                         found_new = True
 
                         if not first_run:
-                            # Достаем инфу о графике и городе для красоты
                             schedule_name = vac.get('schedule', {}).get('name', '')
                             area_name = vac.get('area', {}).get('name', '')
+                            exp_name = vac.get('experience', {}).get('name', '')  # Получаем название опыта для вывода
 
-                            # Ставим эмодзи в зависимости от типа
                             loc_emoji = "🏠" if "удаленная" in schedule_name.lower() else "🏢"
 
                             text = (
                                 f"🔥 <b>{query}</b>\n"
                                 f"💼 {v_title}\n"
+                                f"🎓 Опыт: {exp_name}\n"  # Добавил строку про опыт в сообщение
                                 f"{loc_emoji} {area_name} • {schedule_name}\n"
                                 f"🏦 {vac['employer']['name']}\n"
                                 f"💰 {format_salary(vac['salary'])}\n"
@@ -205,7 +201,6 @@ async def scheduled_checker():
                             except Exception:
                                 pass
 
-                # Пауза между ключевыми словами
                 await asyncio.sleep(2)
 
             if found_new:
@@ -242,4 +237,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
