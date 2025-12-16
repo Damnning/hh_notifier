@@ -23,28 +23,55 @@ TARGET_EXPERIENCE = ["noExperience", "between1And3"]
 
 # Ключевые слова
 SEARCH_QUERIES = [
-    'Python developer',
+    # 1. Data Scientist / ML Engineer (Твой основной профиль)
     'Data Scientist',
-    'Data Engineer',
+    'ML Engineer',
     'Machine Learning',
     'Computer Vision',
     'NLP',
-    'R&D engineer',
+    'AI engineer',
+
+    # 2. Python Backend (У тебя сильный стек: FastAPI, Docker, AsyncIO)
+    'Python developer',
+    'Python backend',
+    'Разработчик Python',
+
+    # 3. Data Analyst (Твой опыт с SQL, EDA, Pandas)
+    'Data Analyst',
     'Аналитик данных',
-    'AI engineer'
+    'Product Analyst',
+    'ETL developer'
+    
+    'R&D engineer',
+
 ]
 
 # Черный список слов (фильтр мусора)
 EXCLUDED_WORDS = [
-    'системный', 'system', 'Fullstack', 'Django', 'Senior', 'Ведущий', 'React', 'Vue', 'Lead',
+    'Fullstack', 'Senior', 'Ведущий', 'React', 'Vue', 'Lead',
     'администратор', 'administrator', 'admin',
-    'преподаватель', 'teacher', 'курсов', 'куратор',
     'support', 'поддержки',
     'manager', 'менеджер',  # Чтобы убрать Affiliate Manager
     'sales', 'продаж',
     '1с', '1c',  # Часто лезет в аналитику
-    'бизнес-аналитик', 'business analyst',
     'директор', 'head', 'cfo', 'ceo'
+
+    # Уровни, которые точно рано
+                               'Principal', 'Руководитель', 'Начальник', 'CTO', 'Team Lead', 'Архитектор', 'Middle'
+
+    # Не твой стек (ты Python)
+                                                                                                           'Java', 'C#',
+    '.NET', 'C++', 'PHP', 'Go', 'Golang', 'Ruby', '1C', '1С',
+    'Bitrix', 'Битрикс', 'Wordpress',
+
+    # Frontend (ты Backend/ML)
+    'Frontend', 'React', 'Vue', 'Angular', 'JS', 'TypeScript', 'Node.js', 'Fullstack', 'Верстальщик',
+
+    # Другие роли
+    'QA', 'Tester', 'Тестировщик', 'Support', 'Поддержка', 'Администратор', 'Administrator', 'Sysadmin', 'DevOps',
+    # DevOps часто требуют совсем другой стек, хотя Docker ты знаешь
+    'Manager', 'Менеджер', 'Sales', 'Продажи', 'Mentor', 'Tutor', 'Куратор',
+    'Business Analyst', 'Бизнес-аналитик'  # Это про процессы, а не про код/данные
 ]
 
 HH_HEADERS = {"User-Agent": "MyTelegramBot/3.0 (danning600@gmail.com)"}

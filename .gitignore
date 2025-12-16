@@ -1,2 +1,7 @@
 .venv
 .idea
+__pycache__/
+.env
+
+seen_vacancies.json
+bot_config.json
